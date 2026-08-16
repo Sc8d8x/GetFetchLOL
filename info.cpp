@@ -5,6 +5,10 @@
 #include <vector>
 #include <iomanip>
 #include <algorithm>
+#include <string>
+#include <cstdlib>
+#include <array> 
+#include <memory>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -16,15 +20,28 @@
 #include <sys/utsname.h>
 #include <sys/sysinfo.h>
 #include <cstdio>
-#include <memory>
 #elif defined(__APPLE__)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <cstdio>
-#include <memory>
 #endif
 
 using namespace std;
+
+
+#ifdef _WIN32
+class RegistryKey {
+    HKEY key;
+public:
+    RegistryKey(HKEY k) : key(k) {}
+    ~RegistryKey() { if (key) RegCloseKey(key); }
+    HKEY get() { return key; }
+};
+#endif
+
+static size_t safePadding(size_t currentLen, size_t maxLen = 45) {
+    return (currentLen < maxLen) ? (maxLen - currentLen) : 0;
+}
 
 // функция определения ОС
 void operation() {
@@ -66,47 +83,59 @@ void DeviceInfo::print() const {
 
 vector<string> DeviceInfo::getInfoAsLines() const {
     vector<string> lines;
-    lines.push_back("  OS: " + osName + " " + osVersion +
-        string(35 - (7 + osName.length() + osVersion.length()), ' '));
-
-    lines.push_back("  Architecture: " + architecture +
-        string(35 - (17 + architecture.length()), ' '));
-
+    
+    // os
+    size_t osLen = 7 + osName.length() + osVersion.length();
+    lines.push_back("  OS: " + osName + " " + osVersion + 
+        string(safePadding(osLen), ' '));
+    
+    // architecture
+    size_t archLen = 17 + architecture.length();
+    lines.push_back("  Architecture: " + architecture + 
+        string(safePadding(archLen), ' '));
+    
+    // ram
     if (totalRAM > 0) {
         string ramStr = to_string(totalRAM / (1024 * 1024 * 1024)) + " GB";
-        lines.push_back("  RAM: " + ramStr +
-            string(35 - (7 + ramStr.length()), ' '));
+        size_t ramLen = 7 + ramStr.length();
+        lines.push_back("  RAM: " + ramStr + 
+            string(safePadding(ramLen), ' '));
     }
-
-    lines.push_back("  Processors: " + to_string(processorCount) +
-        string(35 - (15 + to_string(processorCount).length()), ' '));
-
+    
+    // processors
+    size_t procLen = 15 + to_string(processorCount).length();
+    lines.push_back("  Processors: " + to_string(processorCount) + 
+        string(safePadding(procLen), ' '));
+    
+    // CPU
     if (!processorModel.empty()) {
-        // обрезаем слишком длинные названия процессоров
         string cpu = processorModel;
         if (cpu.length() > 25) {
             cpu = cpu.substr(0, 22) + "...";
         }
-        lines.push_back("  CPU: " + cpu +
-            string(35 - (7 + cpu.length()), ' '));
+        size_t cpuLen = 7 + cpu.length();
+        lines.push_back("  CPU: " + cpu + 
+            string(safePadding(cpuLen), ' '));
     }
-
+    
+    // GPU
     if (!Gpuname.empty() && Gpuname != "Unknown GPU") {
-        // обрезаем слишком длинные названия видеокарт
         string gpu = Gpuname;
         if (gpu.length() > 25) {
             gpu = gpu.substr(0, 22) + "...";
         }
-        lines.push_back("  GPU: " + gpu +
-            string(35 - (7 + gpu.length()), ' '));
+        size_t gpuLen = 7 + gpu.length();
+        lines.push_back("  GPU: " + gpu + 
+            string(safePadding(gpuLen), ' '));
     }
-
+    
+    // hostname
     if (!hostname.empty()) {
-        lines.push_back("  Hostname: " + hostname +
-            string(35 - (12 + hostname.length()), ' '));
+        size_t hostLen = 12 + hostname.length();
+        lines.push_back("  Hostname: " + hostname + 
+            string(safePadding(hostLen), ' '));
     }
-
-
+    
     return lines;
 }
 
@@ -225,7 +254,6 @@ unsigned getProcessorCount() {
 // классы для разных систем
 #ifdef _WIN32
 
-
 typedef LONG(WINAPI* RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
 
 class WindowsDeviceInfo : public DeviceInfoCollector {
@@ -305,13 +333,13 @@ public:
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
             "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
             0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            RegistryKey regKey(hKey);
             char cpuName[256];
             DWORD size = sizeof(cpuName);
-            if (RegQueryValueExA(hKey, "ProcessorNameString", NULL, NULL,
+            if (RegQueryValueExA(regKey.get(), "ProcessorNameString", NULL, NULL,
                 (LPBYTE)cpuName, &size) == ERROR_SUCCESS) {
                 info.processorModel = cpuName;
             }
-            RegCloseKey(hKey);
         }
 
         // информация про видеокарту
@@ -319,15 +347,15 @@ public:
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
             "SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000",
             0, KEY_READ, &hkey) == ERROR_SUCCESS) {
+            RegistryKey regKey(hkey);
             char infoGPU[256];
             DWORD size = sizeof(infoGPU);
-            if (RegQueryValueExA(hkey, "DriverDesc", NULL, NULL,
+            if (RegQueryValueExA(regKey.get(), "DriverDesc", NULL, NULL,
                 (LPBYTE)infoGPU, &size) == ERROR_SUCCESS) {
-                RegCloseKey(hkey);
                 info.Gpuname = infoGPU;
             }
             else {
-                std::cout << "Unkown or Not GPU" << std::endl;
+                std::cout << "Unknown or Not GPU" << std::endl;
             }
         }
             
@@ -337,7 +365,7 @@ public:
 #endif
 
 // linux
-#ifdef __linux__ 
+#ifdef __linux__
 
 class LinuxDeviceInfo : public DeviceInfoCollector {
 public:
@@ -345,27 +373,26 @@ public:
         DeviceInfo info;
         info.hostname = getHostname();
 
-        // информация об ОС
+        // информация о OC
         struct utsname sysInfo;
         if (uname(&sysInfo) == 0) {
             info.osName = sysInfo.sysname;
             info.osVersion = sysInfo.release;
             info.architecture = sysInfo.machine;
-        }
-        else {
+        } else {
             info.osName = "Linux";
         }
 
-        // память 
-        struct sysinfo memInfo;  
+        // память
+        struct sysinfo memInfo;
         if (sysinfo(&memInfo) == 0) {
-            info.totalRAM = memInfo.totalram * memInfo.mem_unit;  
+            info.totalRAM = static_cast<uint64_t>(memInfo.totalram) * memInfo.mem_un        
         }
 
-        // процессор 
+        // процессор
         info.processorCount = getProcessorCount();
 
-        // модель процессора 
+        // модель процессора
         std::ifstream cpuinfo("/proc/cpuinfo");
         if (cpuinfo.is_open()) {
             std::string line;
@@ -380,24 +407,25 @@ public:
             }
             cpuinfo.close();
         }
-        //  информация про видеокарту
 
-        FILE* pipe = popen(""lspci | grep - i 'vga\\|3d\\|display' | head - 1", "r"");
-
+        // информация про видеокарту
+        FILE* pipe = popen("lspci | grep -i 'vga\\|3d\\|display' | head -1", "r");
         if (pipe) {
-            char infoGPU[256];
-            if (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-                pclose(pipe);
-                std::string res = infoGPU;
-
+            std::array<char, 256> buffer;
+            if (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+                std::string res(buffer.data());
                 size_t pos = res.find(": ");
                 if (pos != std::string::npos) {
-                    std::string info1 = res.substr(pos + 2);
-                    if (!info1.empty() && info1[info.length() - 1] == '\n') {
-                        info1.pop_back();
+                    std::string gpuName = res.substr(pos + 2);
+                    if (!gpuName.empty() && gpuName.back() == '\n') {
+                        gpuName.pop_back();
                     }
+                    info.Gpuname = gpuName;
                 }
-                info.Gpuname = info1;
+            }
+            pclose(pipe);
+        } else {
+            info.Gpuname = "Unknown GPU";
         }
 
         return info;
@@ -448,10 +476,6 @@ public:
 };
 
 #endif 
-
-
-
-
 
 std::unique_ptr<DeviceInfoCollector> DeviceInfoCollector::create() {
 #ifdef _WIN32
