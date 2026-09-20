@@ -17,8 +17,8 @@ Quick Start
 git clone https://github.com/Sc8d8x/GetFetchLOL
 
 if used Cmake
-cd getfetchlol
-mkdir build && cd build
-cmake ..
-cmake --build .
-./getfetchlol
+- cd getfetchlol
+- mkdir build && cd build
+- cmake ..
+- cmake --build .
+- ./getfetchlol
