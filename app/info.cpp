@@ -7,8 +7,9 @@
 #include <algorithm>
 #include <string>
 #include <cstdlib>
-#include <array> 
-#include <memory>
+#include <array>
+#include <memory> 
+#include <cstdint>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -28,7 +29,6 @@
 
 using namespace std;
 
-
 #ifdef _WIN32
 class RegistryKey {
     HKEY key;
@@ -41,23 +41,6 @@ public:
 
 static size_t safePadding(size_t currentLen, size_t maxLen = 45) {
     return (currentLen < maxLen) ? (maxLen - currentLen) : 0;
-}
-
-// функция определения ОС
-void operation() {
-#ifdef _WIN32
-    cout << "Operating System: Windows" << endl;
-#elif __linux__
-    cout << "Operating System: Linux" << endl;
-#elif __APPLE__
-    cout << "Operating System: macOS" << endl;
-#elif __unix__
-    cout << "Operating System: Unix" << endl;
-#elif defined(_POSIX_VERSION)
-    cout << "Operating System: POSIX-compliant" << endl;
-#else 
-    cout << "Operating System: Unknown" << endl;
-#endif
 }
 
 void DeviceInfo::print() const {
@@ -83,30 +66,30 @@ void DeviceInfo::print() const {
 
 vector<string> DeviceInfo::getInfoAsLines() const {
     vector<string> lines;
-    
+
     // os
     size_t osLen = 7 + osName.length() + osVersion.length();
-    lines.push_back("  OS: " + osName + " " + osVersion + 
+    lines.push_back("  OS: " + osName + " " + osVersion +
         string(safePadding(osLen), ' '));
-    
-    // architecture
-    size_t archLen = 17 + architecture.length();
-    lines.push_back("  Architecture: " + architecture + 
+
+    // architecture 
+    size_t archLen = 16 + architecture.length();
+    lines.push_back("  Architecture: " + architecture +
         string(safePadding(archLen), ' '));
-    
+
     // ram
     if (totalRAM > 0) {
         string ramStr = to_string(totalRAM / (1024 * 1024 * 1024)) + " GB";
         size_t ramLen = 7 + ramStr.length();
-        lines.push_back("  RAM: " + ramStr + 
+        lines.push_back("  RAM: " + ramStr +
             string(safePadding(ramLen), ' '));
     }
-    
+
     // processors
-    size_t procLen = 15 + to_string(processorCount).length();
-    lines.push_back("  Processors: " + to_string(processorCount) + 
+    size_t procLen = 14 + to_string(processorCount).length();
+    lines.push_back("  Processors: " + to_string(processorCount) +
         string(safePadding(procLen), ' '));
-    
+
     // CPU
     if (!processorModel.empty()) {
         string cpu = processorModel;
@@ -114,10 +97,10 @@ vector<string> DeviceInfo::getInfoAsLines() const {
             cpu = cpu.substr(0, 22) + "...";
         }
         size_t cpuLen = 7 + cpu.length();
-        lines.push_back("  CPU: " + cpu + 
+        lines.push_back("  CPU: " + cpu +
             string(safePadding(cpuLen), ' '));
     }
-    
+
     // GPU
     if (!Gpuname.empty() && Gpuname != "Unknown GPU") {
         string gpu = Gpuname;
@@ -125,22 +108,21 @@ vector<string> DeviceInfo::getInfoAsLines() const {
             gpu = gpu.substr(0, 22) + "...";
         }
         size_t gpuLen = 7 + gpu.length();
-        lines.push_back("  GPU: " + gpu + 
+        lines.push_back("  GPU: " + gpu +
             string(safePadding(gpuLen), ' '));
     }
-    
+
     // hostname
     if (!hostname.empty()) {
         size_t hostLen = 12 + hostname.length();
-        lines.push_back("  Hostname: " + hostname + 
+        lines.push_back("  Hostname: " + hostname +
             string(safePadding(hostLen), ' '));
     }
-    
+
     return lines;
 }
 
 void DeviceInfo::displayWithAscii() const {
-    // ASCII арт
     vector<string> asciiArt = {
         "=====================------------=-----------",
         "==================-----=---------------------",
@@ -171,10 +153,8 @@ void DeviceInfo::displayWithAscii() const {
         "....::-##*+*=+=:=*+..:-:---=-==******++******"
     };
 
-    // получаем информацию как строки
     vector<string> infoLines = getInfoAsLines();
 
-    // находим максимальную ширину ASCII арта
     size_t maxAsciiWidth = 0;
     for (const auto& line : asciiArt) {
         if (line.length() > maxAsciiWidth) {
@@ -182,10 +162,8 @@ void DeviceInfo::displayWithAscii() const {
         }
     }
 
-    // отступ между колонками
     size_t padding = 4;
 
-    // очищаем экран
 #ifdef _WIN32
     system("cls");
 #else
@@ -194,11 +172,9 @@ void DeviceInfo::displayWithAscii() const {
 
     cout << "\n";
 
-    // выводим бок о бок
     size_t maxLines = max(asciiArt.size(), infoLines.size());
 
     for (size_t i = 0; i < maxLines; i++) {
-        // ASCII арт слева
         if (i < asciiArt.size()) {
             cout << left << setw(maxAsciiWidth) << asciiArt[i];
         }
@@ -206,10 +182,8 @@ void DeviceInfo::displayWithAscii() const {
             cout << string(maxAsciiWidth, ' ');
         }
 
-        // отступ
         cout << string(padding, ' ');
 
-        // информация справа
         if (i < infoLines.size()) {
             cout << infoLines[i];
         }
@@ -220,17 +194,18 @@ void DeviceInfo::displayWithAscii() const {
     cout << "\n";
 }
 
-// функция получения hostname 
 std::string getHostname() {
-    char buffer[256];
+    char buffer[256] = { 0 };
 
 #ifdef _WIN32
     DWORD size = sizeof(buffer);
     if (GetComputerNameA(buffer, &size)) {
+        buffer[sizeof(buffer) - 1] = '\0';
         return std::string(buffer);
     }
 #elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
     if (gethostname(buffer, sizeof(buffer)) == 0) {
+        buffer[sizeof(buffer) - 1] = '\0';
         return std::string(buffer);
     }
 #endif
@@ -238,7 +213,6 @@ std::string getHostname() {
     return "unknown";
 }
 
-// получаем количество ядер процессора 
 unsigned getProcessorCount() {
 #ifdef _WIN32
     SYSTEM_INFO sysInfo;
@@ -251,7 +225,6 @@ unsigned getProcessorCount() {
 #endif
 }
 
-// классы для разных систем
 #ifdef _WIN32
 
 typedef LONG(WINAPI* RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
@@ -271,7 +244,6 @@ public:
                     info.osVersion = std::to_string(osvi.dwMajorVersion) + "." +
                         std::to_string(osvi.dwMinorVersion);
 
-                    // определяем конкретное название ОС
                     if (osvi.dwMajorVersion == 11) {
                         info.osName = "Windows 11";
                     }
@@ -306,7 +278,6 @@ public:
             info.osName = "Windows";
         }
 
-        // архитектура
         SYSTEM_INFO sysInfo;
         GetSystemInfo(&sysInfo);
         info.processorCount = sysInfo.dwNumberOfProcessors;
@@ -321,50 +292,51 @@ public:
             info.architecture = "Unknown";
         }
 
-        // память
         MEMORYSTATUSEX memoryStatus;
         memoryStatus.dwLength = sizeof(memoryStatus);
         if (GlobalMemoryStatusEx(&memoryStatus)) {
             info.totalRAM = memoryStatus.ullTotalPhys;
         }
 
-        // название процессора
         HKEY hKey;
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
             "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
             0, KEY_READ, &hKey) == ERROR_SUCCESS) {
             RegistryKey regKey(hKey);
-            char cpuName[256];
+            char cpuName[256] = { 0 };
             DWORD size = sizeof(cpuName);
             if (RegQueryValueExA(regKey.get(), "ProcessorNameString", NULL, NULL,
                 (LPBYTE)cpuName, &size) == ERROR_SUCCESS) {
+                cpuName[sizeof(cpuName) - 1] = '\0';
                 info.processorModel = cpuName;
             }
         }
 
-        // информация про видеокарту
         HKEY hkey;
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
             "SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000",
             0, KEY_READ, &hkey) == ERROR_SUCCESS) {
             RegistryKey regKey(hkey);
-            char infoGPU[256];
+            char infoGPU[256] = { 0 };
             DWORD size = sizeof(infoGPU);
             if (RegQueryValueExA(regKey.get(), "DriverDesc", NULL, NULL,
                 (LPBYTE)infoGPU, &size) == ERROR_SUCCESS) {
+                infoGPU[sizeof(infoGPU) - 1] = '\0';
                 info.Gpuname = infoGPU;
             }
             else {
-                std::cout << "Unknown or Not GPU" << std::endl;
+                info.Gpuname = "Unknown GPU";
             }
         }
-            
+        else {
+            info.Gpuname = "Unknown GPU";
+        }
+
         return info;
     }
 };
 #endif
 
-// linux
 #ifdef __linux__
 
 class LinuxDeviceInfo : public DeviceInfoCollector {
@@ -373,26 +345,24 @@ public:
         DeviceInfo info;
         info.hostname = getHostname();
 
-        // информация о OC
         struct utsname sysInfo;
         if (uname(&sysInfo) == 0) {
             info.osName = sysInfo.sysname;
             info.osVersion = sysInfo.release;
             info.architecture = sysInfo.machine;
-        } else {
+        }
+        else {
             info.osName = "Linux";
         }
 
-        // память
         struct sysinfo memInfo;
         if (sysinfo(&memInfo) == 0) {
-            info.totalRAM = static_cast<uint64_t>(memInfo.totalram) * memInfo.mem_un        
+            // Исправлено переполнение
+            info.totalRAM = static_cast<uint64_t>(memInfo.totalram) * memInfo.mem_unit;
         }
 
-        // процессор
         info.processorCount = getProcessorCount();
 
-        // модель процессора
         std::ifstream cpuinfo("/proc/cpuinfo");
         if (cpuinfo.is_open()) {
             std::string line;
@@ -408,10 +378,9 @@ public:
             cpuinfo.close();
         }
 
-        // информация про видеокарту
         FILE* pipe = popen("lspci | grep -i 'vga\\|3d\\|display' | head -1", "r");
         if (pipe) {
-            std::array<char, 256> buffer;
+            std::array<char, 256> buffer = { 0 };
             if (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
                 std::string res(buffer.data());
                 size_t pos = res.find(": ");
@@ -424,7 +393,8 @@ public:
                 }
             }
             pclose(pipe);
-        } else {
+        }
+        else {
             info.Gpuname = "Unknown GPU";
         }
 
@@ -434,48 +404,65 @@ public:
 
 #endif 
 
-// macOS
 #ifdef __APPLE__
 
-class MacOSInfo : public DeviceInfoCollector {  
+class MacOSInfo : public DeviceInfoCollector {
 public:
     DeviceInfo collect() override {
         DeviceInfo info;
-        info.hostname = getHostname();  
-        info.osName = "macOS";  
+        info.hostname = getHostname();
+        info.osName = "macOS";
 
-        // версия
-        char version[256];
+        char version[256] = { 0 };
         size_t len = sizeof(version);
-        sysctlbyname("kern.osrelease", version, &len, NULL, 0);
-        info.osVersion = version;
+        if (sysctlbyname("kern.osrelease", version, &len, NULL, 0) == 0) {
+            info.osVersion = version;
+        }
+        else {
+            info.osVersion = "Unknown";
+        }
 
-        // архитектура 
-        char arch[256];
+        char arch[256] = { 0 };
         len = sizeof(arch);
-        sysctlbyname("hw.machine", arch, &len, NULL, 0);
-        info.architecture = arch;
+        if (sysctlbyname("hw.machine", arch, &len, NULL, 0) == 0) {
+            info.architecture = arch;
+        }
+        else {
+            info.architecture = "Unknown";
+        }
 
-        // память
-        uint64_t memsize;
+        uint64_t memsize = 0;
         len = sizeof(memsize);
-        sysctlbyname("hw.memsize", &memsize, &len, NULL, 0);
-        info.totalRAM = memsize;
+        if (sysctlbyname("hw.memsize", &memsize, &len, NULL, 0) == 0) {
+            info.totalRAM = memsize;
+        }
 
-        // процессор 
         info.processorCount = getProcessorCount();
 
-        // модель процессора
-        char model[256];
+        char model[256] = { 0 };
         len = sizeof(model);
-        sysctlbyname("machdep.cpu.brand_string", model, &len, NULL, 0);
-        info.processorModel = model;
+        if (sysctlbyname("machdep.cpu.brand_string", model, &len, NULL, 0) == 0) {
+            info.processorModel = model;
+        }
+        else {
+            info.processorModel = "Unknown";
+        }
 
         return info;
     }
 };
 
 #endif 
+
+class UnknownCollector : public DeviceInfoCollector {
+public:
+    DeviceInfo collect() override {
+        DeviceInfo info;
+        info.osName = "Unknown";
+        info.hostname = getHostname();
+        return info;
+    }
+};
 
 std::unique_ptr<DeviceInfoCollector> DeviceInfoCollector::create() {
 #ifdef _WIN32
@@ -485,15 +472,6 @@ std::unique_ptr<DeviceInfoCollector> DeviceInfoCollector::create() {
 #elif defined(__APPLE__)
     return std::make_unique<MacOSInfo>();
 #else
-    class UnknownCollector : public DeviceInfoCollector {  
-    public:
-        DeviceInfo collect() override {
-            DeviceInfo info;
-            info.osName = "Unknown";
-            info.hostname = getHostname();
-            return info;
-        }
-    };
     return std::make_unique<UnknownCollector>();
 #endif
 }
